@@ -1,4 +1,51 @@
+--[[
+    This is a demo.  I have made no effort to make this code robust or reliable.
+    The idea is to disable the colliders in both the die and the effect cube,
+    move the effect to the center of the die then invoke the effect. Finally,
+    return the effect cube to storage and enable both colliders.
 
+    In theory, it is not necessary to keep the collider on the effect cube enabled,
+    in real life you will probably need to do something with it by hand, and you
+    can't if the collider is disabled.  You can only handle it with your script.
+
+    What you need:
+        an object reference with some asset bundle.  In this demo I define beams.
+            as implemented, beams is always locked, and after first use, not
+            interactable with the mouse.  Generally I wouldn't recommend this.
+            If you add code here like that for self, lock and disable before use,
+            unlock and enable after, you have a friendlier mod.  I was lazy. :)
+        an object that will be at the center of the effect; the die in this demo,
+            this script is copied into that object's script.
+        I also have a second assetBundle for the sounds; IF you want the sounds
+            to originate at the die, you would use the same idea with the noises
+            cube.  For sound, not too important unless you are doing a game where
+            your point of view and scale puts you inside the play area on the table
+            I have seen some beautiful examples of this.
+
+    You can use any method you want to get your object references.  My hard coded
+    method is quick and dirty, good enough for a demo.
+
+    Timing is VERY important. Depending on variables over which you have very
+    little control.  There may be a way to test to see if the animation is running,
+    but I haven't looked for it.  For this demo, I just make the delay large.
+    this determines how soon you can again touch the object.
+
+    While this method is ok for a demo or free mod hack, it is NOT suitable for
+    a "product".  It is very costly in memory and time.  For the product, you
+    need a more efficient solution.
+
+    What might work:
+        It may be possible to make the AssetBundle play its animation at another
+        location than the center of the object.  This has tremendous advantages.
+
+        Something like
+        beams.setAnimationTransform({position = <vector>, rotation = <vector>})
+        beams.playTriggerEffect(<int>)
+
+        I will be looking into this soon.
+
+    I have added a check to see if the die is thrown...
+--]]
 function onRandomize()
     startLuaCoroutine(self, "die_coroutine")
 end
