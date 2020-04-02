@@ -1,0 +1,29 @@
+-- Hook this up to chat to spread out a deck so you can look at it.
+-- utility used during initial set up.
+function spread(player)
+    -- print("spread got ", player)
+    local locations = {}
+    local deck = player.getHoverObject()
+    local anchor = deck.getPosition()
+    local basex = anchor.x
+    local basez = anchor.z
+    local pos = {x = 0, y = anchor.y, z = 0}
+    local offx = 2 -- adjust for initial offset
+    local offz = 0
+
+    for i, obj in ipairs(deck.getObjects()) do
+        if locations[obj.name] then
+            deck.takeObject({guid = obj.guid, position = locations[obj.name]})
+        else
+            pos.x = basex - offx
+            pos.z = basez + offz
+            deck.takeObject({guid = obj.guid, position = pos})
+            locations[obj.name] = pos
+            offx = offx + 2.5 -- adjust for size of card
+            if offx > 5 then
+                offx = 2 -- adjust for row offsets
+                offz = offz - 2.5 -- adjust for size
+            end
+        end
+    end
+end
