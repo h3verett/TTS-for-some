@@ -142,7 +142,14 @@ tB = {
             player = Player[p2]
         end
         broadcastToAll("Game started by " .. player.color, player.color)
-        tB.order = table.sort(getSeatedPlayers(),
+        local players = nil
+        if Notes.getNotes() ~= "" then -- if notess is a JSON list...
+            players = JSON.decode(Notes.getNotes())
+        end
+        if players == nil then -- notes not a list or empty
+            players = getSeatedPlayers()
+        end
+        tB.order = table.sort(players,
             function(a, b)
                 return Player[a].getHandTransform().rotation.y < Player[b].getHandTransform().rotation.y
             end
