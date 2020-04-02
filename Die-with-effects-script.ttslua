@@ -1,0 +1,32 @@
+
+function onRandomize()
+    startLuaCoroutine(self, "die_coroutine")
+end
+
+function die_coroutine()
+    while not self.resting do
+        coroutine.yield(0)
+    end
+    -- if self.getRotationValue() == 1 then -- comment this line and the corresponding end to test!
+        noises = getObjectFromGUID("5e1631")
+        noises.AssetBundle.playTriggerEffect(self.getRotationValue())
+        self.setLock(true)
+        self.getComponents()[6].set('enabled', false)
+        beams = getObjectFromGUID("f5cb2f")
+        beams.getChildren()[1].getChildren()[1].getComponents()[3].set('enabled', false)
+        beams.setPosition(self.getPosition())
+        beams.AssetBundle.playTriggerEffect(1)
+        coWait(5)
+        beams.setPosition(Vector(0, 10, 0))
+        self.getComponents()[6].set('enabled', true)
+        self.setLock(false)
+    -- end
+    return 1
+end
+
+function coWait(secs)
+    local doneTime = secs + os.clock()
+    while os.clock() < doneTime do
+        coroutine.yield(0)
+    end
+end
