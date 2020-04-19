@@ -1,4 +1,3 @@
-
 -------------------------------------------------------------
 -- TurnButton declarations
 -------------------------------------------------------------
@@ -45,6 +44,7 @@ end -- of doNothing
 -- everything else lives inside tB
 -------------------------------------------------------
 tB = {
+    hotSeat = nil,
     UITable = {}, -- Global UI
     UIIndex = 1,
     UITrigger = false, -- make true to update Global UI with UITable
@@ -87,7 +87,7 @@ tB = {
         width = 2500,
         height = 400,
         position = { 2, 0.5, 0 },
-        color = {0.6, 0.4, 0.3 },
+        color = {0.7, 0.5, 0.4 },
         hover_color = {0.5, 0.5,0.5 },
         press_color = {1, 1, 1 },
         label = "Start the Game",
@@ -135,35 +135,57 @@ tB = {
     end,
     -------------------------------------------------------
     -- configure turnButton, then call initGame
-    -- currently initialize3s order to getSeatedPlayers()
+    -- currently initializes order to seated players with hands.  In some versions of this I sort the players into order around the table.
     start = function (p1, p2, p3) -- either obj, color, clicktype or player, value, id and value is nil in this app
         local player = p1 -- screen UI click
         if p3 ~= "playerButton" then -- button classic UI click
             player = Player[p2]
         end
         broadcastToAll("Game started by " .. player.color, player.color)
-        tB.order = table.sort(getSeatedPlayers(),
-            function(a, b)
-                return Player[a].getHandTransform().rotation.y < Player[b].getHandTransform().rotation.y
+
+        tB.order = {}
+        if tB.hotSeat then
+            tB.order = tB.hotSeat
+        else
+            for i,v in ipairs(getSeatedPlayers()) do
+                if Player[v].getHandCount() > 0 then
+                    table.insert(tB.order,v)
+                end
             end
-        )
+            if (tB.order == nil) or (#tB.order == 0) then
+                broadcastToAll("No one with a hand is seated!", {1, 0, 0})
+                return
+            end
+        end
         tB.tbLayout.attributes.height = tostring(25 * #tB.order + 25)
         tB.curIndex = math.random(#tB.order)
         tB.curPlayer = tB.order[tB.curIndex]
         tB.globalXmlTable.attributes.onClick = "tB_endTurn"
-        broadcastToAll("Game started by " .. player.color, player.color)
         broadcastToAll(tB.curPlayer .. ", you are first.", tB.curPlayer)
         tB.show({color = tB.curPlayer, text = "End " .. tB.curPlayer .. "'s turn"})
         tB.playNoise(1)
         if initGame then initGame(player) end
     end, -- end of startTurns
-
+--[[
+    getSeatedPlayersPlus = function() -- if you want players without hands...
+        local playerOut = {}
+        for i, color in ipairs(getSeatedPlayers()) do
+            if Player[color].getHandCount() > 0 then
+                playerOut[color] = Player[color].getHandTransform().rotation.y
+            else
+                playerOut[color] = 360 + i
+            end
+        end
+        log(playerOut)
+        return playerOut
+    end,
+--]]
     ----------------------------------------------------------------
     -- display turnButtons
     -- parameters are:
     --  color = current player color in order, or "Black"
     --  text = string to display in current player's button
-    --
+    --  optional click_function to call on click currently assumes owner is global
     --
     show = function (params) -- display turnButtons
         -- print("tB.show called", " ", params.color, " ", params.text )
@@ -171,8 +193,13 @@ tB = {
         tB.buttonTable.label = params.text
         tB.buttonTable.click_function = "tB_endTurn"
         if params.color == "Black" then
-            tB.buttonTable.click_function = "tB_start"
-            tB.globalXmlTable.attributes.onClick = "tB_start"
+            if params.click_function ~= nil then
+                tB.buttonTable.click_function = params.click_function
+                tB.globalXmlTable.attributes.onClick = params.click_function
+            else
+                tB.buttonTable.click_function = "tB_start"
+                tB.globalXmlTable.attributes.onClick = "tB_start"
+            end
             tB.globalXmlTable.attributes.textColor = "Black"
             tB.globalXmlTable.attributes.text = params.text
             tB.tbLayout.children[3].children = tB.globalXmlTable
@@ -240,7 +267,7 @@ tB = {
                 return
             end
         end
-        print(tB.curPlayer, " is not in the player list (order)")
+        print(tB.curPlayer, " is not in the player list (tB.order)")
         tB.curPlayer = p
     end, -- of setTurn
 
@@ -345,4 +372,3 @@ endMoveUI = function (player, value, id)
 --------------------------------------------------------------------------------
 -- END of turnButton code
 --------------------------------------------------------------------------------
---]]
