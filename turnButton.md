@@ -20,8 +20,7 @@ tB.order -- table of strings used as a circular array; you may alter as you like
 
 tB.init() -- initialize the turnButton with "start the game"
 
-tB.hotSeat -- table of players for use in hotSeat mode.  Copied to order at start if it exists.  Players need not be seated at start time,
-    but will be required to sit before ending their turn.
+tB.hotSeat -- table of players for use in hotSeat mode.  Copied to order at start if it exists.  Players need not be seated at start time, but will be required to sit before ending their turn.
 
 tB.start(player) -- called from UI when a seated player clicks the start button
     currently sets order to getSeatedPlayers() that have hands, re-ordered by hand position around table
