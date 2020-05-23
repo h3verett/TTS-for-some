@@ -189,7 +189,7 @@ tB = {
             buttonTable.attributes.text = player
             buttonTable.attributes.textColor = player
             if player ~= "Grey" and Player[player].getHandTransform() ~= nil then
-                buttonTable.attributes.colors = "#666666|#dddddd|#444444|#00000000"
+                buttonTable.attributes.colors = "#666666|#999999|#444444|#00000000"
             end
             buttonTable.attributes.onClick = "tB_colorSelect"
             table.insert(tB.configXmlEditTable.children[5].children, buttonTable)
@@ -205,7 +205,6 @@ tB = {
     -----------------------------------------------------------------
     -- select color order
     colorSelect = function(player, value, id)
-        log("color chosen" .. value .. " " .. id)
         if value == "-1" and string.sub(id, 1, 12) == "PlayerButton" then
             local pcolor = string.sub(id, 13, -1)
             local buttonTable = deepCopy(tB.configButtonTable)
@@ -290,11 +289,15 @@ tB = {
     -- configure turnButton, then call initGame
     -- currently initializes order to seated players with hands.  In some versions of this I sort the players into order around the table.
     start = function (player)
+        local seatedPlayer = nil
         tB.order = {}
         if tB.hotSeat then
             for _, color in ipairs(tB.hotSeat) do
                 if tB.ttsPlayerColors[color] ~= nil then
                     table.insert(tB.order, color)
+                    if Player[color].seated then
+                        seatedPlayer = color
+                    end
                 else
                     broadcastToAll("invalid player color: " .. color)
                 end
@@ -303,20 +306,20 @@ tB = {
             tB.configXmlEditTable.attributes.active = false
         else
             for i,v in ipairs(getSeatedPlayers()) do
-                if Player[v].getHandCount() > 0 then -- this is not really required.
-                    table.insert(tB.order,v)
-                end
             end
-            if (tB.order == nil) or (#tB.order == 0) then
-                broadcastToAll("No one with a hand is seated!", {1, 0, 0})
-                return
-            end
+        end
+        if (tB.order == nil) or (#tB.order == 0) then
+            broadcastToAll("No one seated!", {1, 0, 0})
+            return
         end
         broadcastToAll("Game started by " .. player.color, player.color)
         tB.tbLayout.attributes.height = tostring(25 * #tB.order + 25)
         tB.curIndex = math.random(#tB.order)
         tB.curPlayer = tB.order[tB.curIndex]
         tB.globalXmlTable.attributes.onClick = "tB_endTurn"
+        if tB.hotSeat then
+            Player[seatedPlayer].changeColor(tB.curPlayer)
+        end
         broadcastToAll(tB.curPlayer .. ", you are first.", tB.curPlayer)
         tB.show({color = tB.curPlayer, text = "End " .. tB.curPlayer .. "'s turn"})
         tB.playNoise(1)
@@ -432,7 +435,7 @@ tB = {
             broadcastToAll(( color or "nil") .. ", You cannot end another player's turn (" .. (tB.curPlayer or "nil") .. ")", {0.8, 0, 0})
             return
         end
-        if onTurnEnd and onTurnEnd() then -- if onTurnEnd returns true, game has accepted turn end otherwise turn isn't ended.
+        if (onTurnEnd and onTurnEnd()) or true then -- if onTurnEnd returns true, game has accepted turn end otherwise turn isn't ended.
             if tB.hotSeat then
                 Player[tB.curPlayer].changeColor(tB.next())
             end
