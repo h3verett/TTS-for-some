@@ -5,7 +5,7 @@ An attempt to isolate turn management from game to enable drop-in operation
 
 Please let me know any ideas or issues you find with this.
 
-
+This version assumes that the Global UI will not change the order or position of the turnButton entries.  A future version will address this.
 This version drops into your global script. It defines these globals:
 
 function tB_curPlayer() -- need this only if you want to use curPlayer in another object.
