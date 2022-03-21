@@ -1,0 +1,603 @@
+-------------------------------------------------------------
+-- TurnButton declarations Version 0.503
+-------------------------------------------------------------
+-- UI work around declarations -- no post processing of UI data so have to use top level names
+function tB_curPlayer() -- need this only if you want to use curPlayer in another object.
+    return tB.curPlayer
+end
+
+function tB_start(player, value, id)
+    tB.start(player, value, id)
+end
+
+function tB_endTurn(player, value, id)
+    tB.endTurn(player, value, id)
+end
+
+function tB_endTurnCall(params)
+    tB.endTurn(params.color, params.value, params.id)
+end
+
+function tB_beginMoveButton(player, value, id)
+    tB.beginMoveButton(player, value, id)
+end
+
+function tB_endMoveUI(player, value, id)
+    tB.endMoveButton(player, value, id)
+end
+
+function tB_toggleGlobalPanel(player, value, id)
+    tB.toggleGlobalPanel(player, value, id)
+end
+
+function tB_config(player, value, id)
+    tB.config(player, value, id)
+end
+
+function tB_colorSelect(player, value, id)
+    tB.colorSelect(player, value, id)
+end
+
+function tB_setOrder(player, value, id)
+    tB.setOrder(player, value, id)
+end
+
+function tB_closeIt(player, value, id)
+    tB.closeIt(player, value, id)
+end
+------------------------------------------------------------------------
+-- required by turnButton, but might be duplicate
+-- NOT a full implementation!!
+
+function deepCopy(original)
+    if type(original) ~= "table" then
+        return original
+    else
+        local copy = {}
+        for i, v in pairs(original) do
+            copy[i] = deepCopy(v)
+        end
+        return copy
+    end
+end -- of deepCopy
+
+function doNothing() -- UI click function REQUIRED by turnButton5
+end -- of doNothing
+-------------------------------------------------------
+-- everything else lives inside tB
+-------------------------------------------------------
+tB = {
+    ttsPlayerColors = {},
+    availableHands = {}, -- holds hand transforms so we can move players around the table
+    availableHandCount = 0,
+    hotSeat = nil,
+    UITable = {}, -- Global UI
+    UITrigger = false, -- make true to update Global UI with UITable
+    triggerIndex = nil,
+    drawSeat = true,
+    curPlayer = "Black",
+    curIndex = 0,
+    order = {},
+    button = nil, -- will default to the noises object; as good as anything to attach the turnButton to
+    globalPanel = true,
+    offset = { x = -250, y = 0 }, -- initial location of global panel relative to upper right screen corner
+    noises = nil, -- assetBundle with some sounds if there is one called "Noises" -- we use index 1 and 3.
+    verbose = false,  -- set to false to eliminate excess verbiage emitted by vcastAll
+
+    -- top level UI for turnButton
+    -- manage details of the on-screen turnButton here.
+    tbLayout = {
+        tag = "Panel",
+        attributes = {
+            id = "turnButton", width = "150", height = "25", color = "#444555", rectAlignment="UpperRight", offsetXY="-250 0",
+            allowDragging="true", returnToOriginalPositionWhenReleased="false", onEndDrag="tB_endMoveButton", active = true,
+        },
+        children = {
+            {   tag = "Button",
+                attributes = { id="closeButton", width="20", height="20", rectAlignment="UpperRight", color="#990000",
+                    textColor="#FFFFFF", text="X", onClick="tB_toggleGlobalPanel" },
+            },
+            {   tag = "Text",
+                attributes = { text="Turn Button", alignment="UpperLeft", fontSize="18", offsetXY="5 0",
+                    fontStyle="Bold", color="#FFFFFF" },
+            },
+            {   tag = "GridLayout",
+                attributes = { id = "orderList", columns = "1", width = "100%", cellsize="150 25", rectAlignment="TopCenter", offsetXY = "0 -20"},
+                children = {},
+            },
+        },
+    },
+
+    -- top level UI for button; need to change to classical UI -- new UI interferes with TTS operations (UI eats clicks)
+    -- Edit this table to match your specific button; this is set up to work with the noise cube I am using.
+    -- top level XML UI for button
+    buttonXmlTable = {
+        tag = "Button",
+        attributes = { id="turnButton",
+            width="1000", height="480", position="0 0 -111", colors="#dddddd|#dddddd|#444444|#00000000",
+            text="Start the Game", fontSize="160", fontStyle="Bold", textColor="Black", onClick = "Global/tB_start",
+        }
+    },
+
+    -- manage the look and feel of your player buttons here
+    globalXmlTable = {
+        tag = "Button",
+        attributes = { id = "playerButton", width = "150", height = "25",
+            text = "Start the Game", fontSize = "20", textColor = "Black",
+            colors="#cccccc|#dddddd|#444444|#00000000", onClick = "tB_start",
+        }
+    },
+    configXmlTable = {
+        tag = "button",
+        attributes = { id = "turnConfig", width = "150", height = "25",
+            text = "HotSeat SetUp", fontSize = "20", textColor = "Black",
+            colors="#cccccc|#dddddd|#444444|#00000000", onClick = "tB_config",
+        },
+    },
+    configButtonTable = {
+        tag = "Button",
+        attributes = { id="playerButton1", width="150", height="25", colors="#666666|#999999|#444444|#00000000",
+            text="Blue", textColor = "#888888", fontStyle = "Bold"
+        }
+    },
+    configXmlEditTable =
+    {   tag = "Panel",
+        attributes = {
+            id = "turnButtonConfigPanel", width = "300", height = "380", color = "#444555", rectAlignment="UpperLeft", offsetXY="50 0",
+            allowDragging="true", returnToOriginalPositionWhenReleased="false", active = false
+        },
+        children = {
+            {   tag = "Button",
+                attributes = { id = "closeConfig", width = "20", height = "20",
+                    rectAlignment = "UpperRight", text="X", textColor = "#ffffff", color = "#990000",
+                    onClick = "tB_closeIt(turnButtonConfigPanel)",
+                },
+            },
+            {   tag = "Text",
+                attributes = {
+                    text = "Configure Turn Button", alignment = "UpperCenter", fontSize = "18",
+                    fontStyle = "Bold", color = "#bbbbbb",
+                },
+            },
+            {   tag = "Text",
+                attributes = {
+                    text = "Choose colors", alignment = "UpperLeft", offsetXY = "10 -25",
+                    fontStyle = "Bold", color = "#bbbbbb", fontSize = "18",
+                }
+            },
+            {   tag = "Text",
+                attributes = {
+                    text = "New order", alignment = "UpperRight", offsetXY = "-30 -25",
+                    fontStyle = "Bold", color = "#bbbbbb", fontSize = "18"
+                }
+            },
+            {   tag = "GridLayout",
+                attributes = { id = "orderList", columns = "2", width = "100%", height = "300", cellsize="150 25", rectAlignment="UpperCenter", offsetXY = "0 -50",
+                    startAxis = "Vertical"},
+                children = {},
+            },
+            {   tag = "Button",
+                attributes = {  id="SetOrder", width="300", height="25", colors="#aaaaaa|#dddddd|#444444|#00000000",
+                        text="Set Order and start", textColor = "#eeeeee", fontStyle = "Bold", onClick = "tB_setOrder",
+                        RectAlignment = "LowerCenter"
+                },
+            },
+        },
+    },
+    ---------------------------------------------------------------
+    -- configure turnButton
+    config = function(player, value, id)
+        tB.configXmlEditTable.children[6].attributes.colors = "#aaaaaa|#dddddd|#444444|#00000000"
+        tB.configXmlEditTable.children[5].children = {}
+        for i, player in ipairs(Player.getColors()) do
+            local buttonTable = deepCopy(tB.configButtonTable)
+            buttonTable.attributes.id = "PlayerButton" .. player
+            buttonTable.attributes.text = player
+            buttonTable.attributes.textColor = player
+            if player ~= "Grey" and Player[player].getHandTransform() ~= nil then
+                buttonTable.attributes.colors = "#cccccc|#dddddd|#444444|#00000000"
+            end
+            buttonTable.attributes.onClick = "tB_colorSelect"
+            table.insert(tB.configXmlEditTable.children[5].children, buttonTable)
+        end
+        tB.configXmlEditTable.attributes.active = true
+        tB.UITrigger = true
+        tB.cfgOrder = {}
+        tB.cfgIndex = #Player.getColors() + 1
+    end,
+
+    -----------------------------------------------------------------
+    -- select color order
+    colorSelect = function(player, value, id)
+        if value == "-1" and string.sub(id, 1, 12) == "PlayerButton" then
+            local pcolor = string.sub(id, 13, -1)
+            local buttonTable = deepCopy(tB.configButtonTable)
+            buttonTable.attributes.id = "orderButton" .. pcolor
+            buttonTable.attributes.text = pcolor
+            buttonTable.attributes.textColor = pcolor
+            buttonTable.attributes.onClick = "tB_colorSelect"
+            table.insert(tB.configXmlEditTable.children[5].children, buttonTable)
+            tB.cfgOrder[pcolor] = tB.cfgIndex
+            tB.cfgIndex = tB.cfgIndex + 1
+        elseif value == "-2" and string.sub(id, 1, 11) == "orderButton" then
+            local pcolor = string.sub(id, 12, -1)
+            local pindex = tB.cfgOrder[pcolor]
+            table.remove(tB.configXmlEditTable.children[5].children, tB.cfgOrder[pcolor])
+            for c, i in pairs(tB.cfgOrder) do
+                if i > pindex then
+                    tB.cfgOrder[c] = tB.cfgOrder[c] - 1
+                end
+            end
+            tB.cfgOrder[pcolor] = nil
+        end
+        tB.UITrigger = true
+    end,
+    -----------------------------------------------------------------
+    -- set player order
+    setOrder = function(player, value, id)
+        tB.hotSeat = {}
+        for i = 13, #tB.configXmlEditTable.children[5].children do
+            table.insert(tB.hotSeat, tB.configXmlEditTable.children[5].children[i].attributes.text)
+        end
+        if #tB.hotSeat == 0 then
+            broadcastToColor("Hot seat player list is empty", player.color, player.color)
+            return
+        end
+        tB.configXmlEditTable.children[6].attributes.colors="#99ff99|#aaffaa|#66ff66|#00000000"
+        tB.UITrigger = true
+        tB.start(player, 0, "playerButton")
+    end,
+    --------------------------------------------------------------
+    -- close an XML Panel
+    closeIt = function(player, value, id)
+        UI.setAttribute(value, "active", false)
+    end,
+
+    -------------------------------------------------------
+    -- set up the buttons with "start the game".
+    init = function ()
+        for inx, colr in ipairs(Player.getColors()) do
+            tB.ttsPlayerColors[colr] = inx -- any non nil value will do, even False
+        end
+        tB.tbLayout.children[3].children = {} -- clear any cruft from previous game
+        if tB.button == nil then
+            tB.button = tB.noises
+        end
+        tB.hotSeat = nil
+        -- kick off maintenance function to update once a second
+        tB.triggerIndex = Wait.time(tB.updateUI, 0.1, -1)
+        tB.show({color = "Black", text = "Start the game"}) -- set the look and feel of the start game button here.
+    end, -- of initTurns
+
+    updateUI = function()
+        if tB ~= nil then
+            if tB.UITrigger then
+                local UITable = UI.getXmlTable()
+                local UIIndex = #UITable + 1
+                local UIConfigIndex = UIIndex + 1
+                for i, item in ipairs(UITable) do
+                    if item.attributes.id == "turnButton" then
+                        UIIndex = i -- if there are duplicates, we keep the last.
+                    elseif item.attributes.id == "turnButtonConfigPanel" then
+                        UIConfigIndex = i
+                    end
+                end
+                UITable[UIIndex] = tB.UITable
+                UITable[UIConfigIndex] = tB.configXmlEditTable
+                if onTurnButtonUpdate ~= nil then
+                    UITable = onTurnButtonUpdate(UITable)
+                end
+                --[[
+                for inx, tbl in pairs(UITable) do
+                    if tbl.attributes ~= nil then
+                        log(string.format("UIB %d %s: %s", inx, tbl.attributes.id, tostring(tbl.attributes.active)))
+                    else
+                        log("UI ".. tostring(inx) .. " UNKNOWN: " .. logString(tbl))
+                    end
+                end
+                --]]
+                UI.setXmlTable(UITable)
+                if tB.button ~= nil then
+                    tB.button.UI.setXmlTable({tB.buttonXmlTable})
+                end
+                tB.UITrigger = false
+            end
+        end
+    end,
+    -------------------------------------------------------
+    -- configure turnButton, then call initGame
+    -- currently initializes order to seated players with hands.  In some versions of this I sort the players into order around the table.
+    start = function (f, s, t) -- meaning depends on caller
+        player = f
+        tB.seatedPlayers = {}
+        tB.order = {}
+        if tB.hotSeat then
+            for _, colr in ipairs(tB.hotSeat) do
+                if tB.ttsPlayerColors[colr] ~= nil then
+                    table.insert(tB.order, colr)
+                    table.insert(tB.seatedPlayers,colr)
+                else
+                    log(tB.ttsPlayerColors, colr)
+                    tB.vcastAll("invalid player color: " .. colr)
+                end
+            end
+            tB.vcastAll("playing hotseat", "White")
+            tB.configXmlEditTable.attributes.active = false
+            if #getSeatedPlayers() ~= 1 then
+                tB.vcastAll("Warning: hotSeat with multiple active seats not (yet) supported.")
+            else
+                tB.hotSeat = getSeatedPlayers()[1]
+            end
+        else
+            tB.seatedPlayers = getSeatedPlayers()
+        end
+        if tB.drawSeat then
+            for inx = #tB.seatedPlayers, 2, -1 do
+                onx = math.random(inx)
+                tB.seatedPlayers[onx], tB.seatedPlayers[inx] = tB.seatedPlayers[inx], tB.seatedPlayers[onx]
+            end
+            tB.order = tB.seatedPlayers
+        else
+            tB.order = table.sort(tB.seatedPlayers, function(a, b) return Player[a].getHandTransform().rotation.y < Player[b].getHandTransform().rotation.y end )
+        end
+        if (tB.order == nil) or (#tB.order == 0) then
+            broadcastToAll("No one seated!", {1, 0, 0})
+            return
+        end
+        if tB.verbose then
+            tB.vcastAll("Game started by " .. player.color, player.color)
+        end
+        tB.tbLayout.attributes.height = tostring(25 * #tB.order + 25)
+        tB.curIndex = math.random(#tB.order)
+        tB.curPlayer = tB.order[tB.curIndex]
+        tB.globalXmlTable.attributes.onClick = "tB_endTurn"
+        if tB.hotSeat then
+            if tB.curPlayer ~= tB.hotSeat then
+                Player[tB.hotSeat].changeColor(tB.curPlayer)
+                tB.hotSeat = tB.curPlayer
+            end
+        end
+        if tB.verbose then
+            tB.vcastAll(tB.curPlayer .. ", you are first.", tB.curPlayer)
+        end
+        tB.show({color = tB.curPlayer, text = "End " .. tB.curPlayer .. "'s turn"})
+        tB.playNoise(1)
+        if (initGame and initGame(player)) then
+            if onTurnStart then
+                onTurnStart()
+            end
+        else -- init failed, so reset.
+            if tB.triggerIndex then
+                Wait.stop(tB.triggerIndex)
+            end
+            tB.init()
+        end
+    end, -- end of start
+
+    ----------------------------------------------------------------
+    -- display turnButtons
+    -- parameters are:
+    --  color = current player color in order, or "Black"
+    --  text = string to display in current player's button
+    --  optional click_function to call on click currently assumes owner is global
+    --
+    show = function (params) -- display turnButtons
+        -- print("tB.show called", " ", params.color, " ", params.text )
+        tB.buttonXmlTable.attributes.textColor = params.color
+        tB.buttonXmlTable.attributes.text = params.text
+        tB.buttonXmlTable.attributes.onClick = "Global/tB_endTurn"
+        tB.tbLayout.children[3].children = {}
+        if params.color == "Black" then --
+            if params.click_function ~= nil then
+                tB.buttonXmlTable.attributes.onClick = "Global/tB_start"
+                tB.globalXmlTable.attributes.onClick = params.click_function
+            else
+                tB.buttonXmlTable.attributes.onClick = "Global/tB_start"
+                tB.globalXmlTable.attributes.onClick = "tB_start"
+            end
+            tB.tbLayout.attributes.height = "75"
+            tB.globalXmlTable.attributes.textColor = "Black"
+            tB.globalXmlTable.attributes.text = params.text
+            table.insert(tB.tbLayout.children[3].children, tB.configXmlTable)
+            table.insert(tB.tbLayout.children[3].children, tB.globalXmlTable)
+        else
+            for _, player in ipairs(tB.order) do
+                tB.globalXmlTable.attributes.textColor = player
+                if player == params.color then
+                    tB.globalXmlTable.attributes.onClick = "tB_endTurn"
+                    tB.globalXmlTable.attributes.text = params.text
+                else
+                    tB.globalXmlTable.attributes.onClick = "doNothing"
+                    tB.globalXmlTable.attributes.text = player
+                end
+                table.insert(tB.tbLayout.children[3].children, deepCopy(tB.globalXmlTable))
+            end
+        end
+
+        if tB.globalPanel then
+            tB.UITable = deepCopy(tB.tbLayout)
+        end
+        tB.UITrigger = true
+    end, -- of show
+
+    -- Return entry in order just after current player
+    next = function()
+        local ix = tB.curIndex + 1
+        if ix > #tB.order then
+            ix = 1
+        end
+        return tB.order[ix]
+    end,
+
+    -- Return entry in order just before current player
+    prev = function()
+        local ix = tB.curIndex - 1
+        if ix < 1 then
+            ix = #tB.order
+        end
+        return tB.order[ix]
+    end, -- of prev
+
+    -- force end of current player's turn bypassing rule that only current player may end hes or her turn.
+    pass = function(color)
+        tB.endTurn(nil)
+    end, -- of passTurn
+
+    -- Make it newPlayer's turn -- newPlayer is a color
+    set = function(newPlayer)
+        for i, color in ipairs(tB.order) do
+            if color == newPlayer then
+                if tB.hotSeat then
+                    -- Player[getSeatedPlayers()[1]].changeColor(newPlayer)
+                    tB.hotSeat = newPlayer
+                end
+                tB.curIndex = i
+                tB.curPlayer = newPlayer
+                tB.vcastAll(tB.curPlayer .. ", it is your turn.", tB.curPlayer)
+                tB.show({color = tB.curPlayer, text = "End " .. tB.curPlayer .. "'s turn"})
+                return
+            end
+        end
+        broadcastToAll(newPlayer .. " is not in the player list (tB.order)")
+    end, -- of setTurn
+
+    -- player clicked end turn
+    endTurn = function(p1, p2, p3)
+        if p1 ~= nil then
+            local color = p1.color
+            -- remove this if block to allow any player to end any other player's turn
+            if color and color ~= tB.curPlayer
+            -- and color ~= "Black" -- uncoment this to allow DM to end a turn.
+            then
+                broadcastToAll(( color or "nil") .. ", You cannot end another player's turn (" .. (tB.curPlayer or "nil") .. ")", {0.8, 0, 0})
+                return
+            end
+        end
+        if onTurnEnd and not onTurnEnd() then -- onTurnEnd exists but denys end turnButton
+            tB.vcastAll("end turn denied")
+            return
+        else
+            tB.curIndex = tB.curIndex + 1
+            if tB.curIndex > #tB.order then
+                tB.curIndex = 1
+            end
+            tB.curPlayer = tB.order[tB.curIndex]
+            if tB.hotSeat then
+                Player[getSeatedPlayers()[1]].changeColor(tB.curPlayer)
+                tB.hotSeat = tB.curPlayer
+            end
+
+            tB.show({color = tB.curPlayer, text = "End " .. tB.curPlayer .. "'s turn"})
+            if onTurnStart then
+                onTurnStart()
+            end -- call user turn start function
+        end
+    end, -- of endTurn
+
+    -- Show or hide the global UI
+    toggleGlobalPanel = function (player, value, id)
+        if value == "-2" then
+            onLoad()
+        else
+            tB.globalPanel = not tB.globalPanel
+            if tB.globalPanel then
+                Global.UI.show("turnButton")
+            else
+                Global.UI.hide("turnButton")
+            end
+        end
+        return tB.globalPanel
+    end, -- of toggleGlobalPanel
+
+    -----------------------------------------------------------------------
+    -- implements onSave and onLoad support
+    save = function()
+        local tBData = {
+            order = tB.order,
+            curIndex = tB.curIndex,
+            curPlayer = tB.curPlayer,
+            globalPanel = tB.globalPanel,
+            UITable = tB.UITable,
+            UIIndex = tB.UIIndex,
+            offset = tB.offset,
+        }
+        local obj = tB.button
+        if obj ~= nil then
+            tBData.button = tB.button.getGUID()
+        end
+        local obj = tB.noises
+        if obj ~= nil then
+            tBData.noises = tB.noises.getGUID()
+        end
+        return tBData
+    end, -- of save
+
+    restore = function(tBData)
+        if tBData and tBData ~= "" then
+            if tB.noises ~= nil then
+                tBData.noises = tB.noises.getGUID()
+            end
+            for k, v in pairs(tBData) do
+                tB[k] = v
+            end
+            if tB.noises ~= nil then
+                tB.noises = getObjectFromGUID(tB.noises)
+            end
+            if tB.button ~= nil then
+                tB.button = getObjectFromGUID(tB.button)
+            end
+        else
+            tB.init()
+        end
+        if tB.triggerIndex then
+            Wait.stop(tB.triggerIndex)
+        end
+        tB.triggerIndex = Wait.time(tB.updateUI, 0.1, -1)
+        if tB.curPlayer == "Black" then
+            tB.show({color = "Black", text = "Start the Game"})
+        else
+            tB.show({color = tB.curPlayer, text = "End " .. tB.curPlayer .. "'s turn"})
+        end
+    end,
+
+    -------------------------------------------------------
+    -- Utility functions
+    -------------------------------------------------------
+    playNoise = function(index) -- play a sound if we can.
+        if tB.noises ~= nil then
+            tB.noises.AssetBundle.playTriggerEffect(index)
+        end
+    end, -- of playNoise
+
+    vcastAll = function(message, color)
+        if tB.verbose then
+            broadcastToAll(message, color)
+        end
+    end,
+    -------------------------------------------------------
+    -- These functions are experimental and tempramental.
+    -- To position your turnButton dynamically, you need to...
+    -- 1.  use topDown camera
+    -- 2.  set view directly over center of table
+    -- 3. zoom untill table just fills screen vertically
+    -- 4. adjust x and y calculations.  Only constants should be changed.
+    -- 5 TEST and repeat :-)
+    -------------------------------------------------------
+
+    -------------------------------------------------------
+    -- complete drag response
+    endMoveUI = function (player, value, id)
+        local newPos = player.getPointerPosition() -- assumes topDown view on 26x15 viewport
+        log(string.format("endDrag: %8.2f %8.2f", newPos.x, newPos.z))
+        local x = math.max(math.min((newPos.x - 26) * 35, 0), -1760)
+        local y = math.max(math.min((newPos.z - 16) * 35, 0), -1024)
+        log(string.format("%6.2f %6.2f -> %6.2f %6.2f", tB.offset.x, tB.offset.y, x, y))
+        tB.offset = {x = x, y = y}
+        tB.tbLayout.attributes.offsetXY = string.format('%d %d', tB.offset.x, tB.offset.y)
+    end, -- of endMoveTurnButton
+
+
+}
+--------------------------------------------------------------------------------
+-- END of turnButton code
+--------------------------------------------------------------------------------
